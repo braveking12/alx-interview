@@ -1,42 +1,53 @@
-#!/usr/bin/env node
+#!/usr/bin/node
 
 const request = require('request');
 
-if (process.argv.length !== 3) {
-  console.error('Usage: ./0-starwars_characters.js <Movie ID>');
-  process.exit(1);
-}
-
 const movieId = process.argv[2];
-const apiUrl = `https://swapi-api.hbtn.io/api/films/${movieId}/`;
+const filmEndPoint = 'https://swapi-api.hbtn.io/api/films/' + movieId;
+let people = [];
+const names = [];
 
-request(apiUrl, { json: true }, (err, res, body) => {
-  if (err) {
-    console.error(err);
-    process.exit(1);
+const requestCharacters = async () => {
+  await new Promise(resolve => request(filmEndPoint, (err, res, body) => {
+    if (err || res.statusCode !== 200) {
+      console.error('Error: ', err, '| StatusCode: ', res.statusCode);
+    } else {
+      const jsonBody = JSON.parse(body);
+      people = jsonBody.characters;
+      resolve();
+    }
+  }));
+};
+
+const requestNames = async () => {
+  if (people.length > 0) {
+    for (const p of people) {
+      await new Promise(resolve => request(p, (err, res, body) => {
+        if (err || res.statusCode !== 200) {
+          console.error('Error: ', err, '| StatusCode: ', res.statusCode);
+        } else {
+          const jsonBody = JSON.parse(body);
+          names.push(jsonBody.name);
+          resolve();
+        }
+      }));
+    }
+  } else {
+    console.error('Error: Got no Characters for some reason');
   }
+};
 
-  if (res.statusCode !== 200) {
-    console.error(`Failed to get movie data: ${res.statusCode}`);
-    process.exit(1);
+const getCharNames = async () => {
+  await requestCharacters();
+  await requestNames();
+
+  for (const n of names) {
+    if (n === names[names.length - 1]) {
+      process.stdout.write(n);
+    } else {
+      process.stdout.write(n + '\n');
+    }
   }
+};
 
-  const characterUrls = body.characters;
-
-  characterUrls.forEach((characterUrl) => {
-    request(characterUrl, { json: true }, (err, res, body) => {
-      if (err) {
-        console.error(err);
-        process.exit(1);
-      }
-
-      if (res.statusCode !== 200) {
-        console.error(`Failed to get character data: ${res.statusCode}`);
-        process.exit(1);
-      }
-
-      console.log(body.name);
-    });
-  });
-});
-
+getCharNames();
